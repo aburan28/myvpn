@@ -1,5 +1,6 @@
 import logging
 from socket import socket, AF_INET, SOCK_DGRAM
+from subprocess import check_call, call
 
 from myvpn.tun import Tun
 from myvpn.utils import populate_common_argument_parser, proxy
@@ -17,6 +18,10 @@ def populate_argument_parser(parser):
 def main(args):
     tun = Tun(device=args.device, ip=args.ip, peer_ip=args.peer_ip)
     tun.open()
+
+    netseg = '.'.join(args.ip.split('.')[:3] + ['0/24'])
+    call(['iptables', '-t', 'nat', '-D', 'POSTROUTING', '-s', netseg, '-j', 'MASQUERADE'])
+    check_call(['iptables', '-t', 'nat', '-A', 'POSTROUTING', '-s', netseg, '-j', 'MASQUERADE'])
 
     sock = socket(AF_INET, SOCK_DGRAM)
 
