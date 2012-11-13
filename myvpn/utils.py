@@ -18,11 +18,18 @@ def populate_common_argument_parser(parser):
                         help="TUN device [default: %(default)s]")
 
 
+def encrypt(data):
+    return data[::-1]
+
+def decrypt(data):
+    return data[::-1]
+
 def proxy(tun_fd, sock, peer):
     while 1:
         fd = select([tun_fd, sock], [], [])[0][0]
         if fd == tun_fd:
             data = os.read(tun_fd, 1500)
+            data = encrypt(data)
             logger.debug("> %dB", len(data))
             sock.sendto('%04x' % len(data) + data, peer)
         else:
@@ -37,6 +44,7 @@ def proxy(tun_fd, sock, peer):
                 logger.warning("Got broken packet. expect %dB, got %dB", data_len, len(data))
                 continue
             logger.debug("< %dB", data_len)
+            data = decrypt(data)
             os.write(tun_fd, data)
 
 
