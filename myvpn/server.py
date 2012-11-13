@@ -1,23 +1,38 @@
 import logging
-from socket import socket, SOL_SOCKET, SO_REUSEADDR
+from socket import socket, AF_INET, SOCK_DGRAM
 
 from myvpn.tun import Tun
 from myvpn.utils import populate_common_argument_parser, proxy
+from myvpn.consts import MAGIC_WORD
 
 logger = logging.getLogger(__name__)
 
 def populate_argument_parser(parser):
     populate_common_argument_parser(parser)
+    parser.add_argument('--ip', default='192.168.5.1',
+                        help="[default: %(default)s]")
+    parser.add_argument('--peer-ip', default='192.168.5.2',
+                        help="[default: %(default)s]")
 
 def main(args):
-    tun = Tun(args.ip, device=args.device)
+    tun = Tun(device=args.device, ip=args.ip, peer_ip=args.peer_ip)
     tun.open()
 
-    sock = socket()
-    sock.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)
-    sock.bind(('0.0.0.0', args.port))
-    sock.listen(1)
-    client, client_addr = sock.accept()
-    logger.info("Client %s connected", client_addr)
+    sock = socket(AF_INET, SOCK_DGRAM)
 
-    proxy(tun, client)
+    try:
+        sock.bind(('0.0.0.0', args.port))
+
+        while 1:
+            word, peer = sock.recvfrom(1500)
+            if word == MAGIC_WORD:
+                logger.debug("handshake")
+                break
+            logger.warning("bad magic word for %s:%i" % peer)
+
+        sock.sendto(MAGIC_WORD, peer)
+
+        proxy(tun.fd, sock, peer)
+
+    except KeyboardInterrupt:
+        logger.warning("user stop")
