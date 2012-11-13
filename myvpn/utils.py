@@ -1,6 +1,7 @@
 import os
 import logging
 from select import select
+from collections import deque
 
 from myvpn.consts import DEFAULT_PORT
 
@@ -25,6 +26,7 @@ def decrypt(data):
     return data[::-1]
 
 def proxy(tun_fd, sock, peer):
+    inq, outq = deque(), deque()
     while 1:
         fd = select([tun_fd, sock], [], [])[0][0]
         if fd == tun_fd:
@@ -46,6 +48,3 @@ def proxy(tun_fd, sock, peer):
             logger.debug("< %dB", data_len)
             data = decrypt(data)
             os.write(tun_fd, data)
-
-
-
