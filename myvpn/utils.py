@@ -26,7 +26,7 @@ def proxy(tun_fd, sock, peer):
             logger.debug("> %dB", len(data))
             sock.sendto('%04x' % len(data) + data, peer)
         else:
-            data, remote_addr = sock.recvfrom(1500)
+            data, remote_addr = sock.recvfrom(1504)
             if remote_addr != peer:
                 logger.warning("Got packet from %s:%i instead of %s:%i" %
                                (remote_addr + peer))
@@ -34,7 +34,7 @@ def proxy(tun_fd, sock, peer):
             data_len = int(data[:4], 16)
             data = data[4:]
             if len(data) != data_len:
-                logger.warning("Got broken packet. expect %B, got %B", data_len, len(data))
+                logger.warning("Got broken packet. expect %dB, got %dB", data_len, len(data))
                 continue
             logger.debug("< %dB", data_len)
             os.write(tun_fd, data)
