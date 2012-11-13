@@ -1,6 +1,7 @@
 import os
 import logging
 from select import select
+from collections import deque
 
 from myvpn.consts import DEFAULT_PORT
 
@@ -19,19 +20,39 @@ def populate_common_argument_parser(parser):
 
 
 def proxy(tun_fd, sock, peer):
+    inq, outq = deque(), deque()
     while 1:
-        fd = select([tun_fd, sock], [], [])[0][0]
-        if fd == tun_fd:
-            data = os.read(tun_fd, 1500)
-            logger.debug("> %dB", len(data))
-            sock.sendto('%04x' % len(data) + data, peer)
-        else:
-            data, remote_addr = sock.recvfrom(1500)
-            if remote_addr != peer:
-                logger.warning("Got packet from %s:%i instead of %s:%i" %
-                               (remote_addr + peer))
-                continue
-            logger.debug("< %dB", len(data))
-            data_len = data[:4]
-            data = data[4:4+int(data_len, 16)]
-            os.write(tun_fd, data)
+        r, w = select([tun_fd, sock], [tun_fd, sock], [])
+
+        for fd in r:
+            if fd == tun_fd:
+                data = os.read(tun_fd, 1500)
+                logger.debug("> %dB", len(data))
+                outq.append(data)
+
+            else:
+                data, remote_addr = sock.recvfrom(1504)
+                if remote_addr != peer:
+                    logger.warning("Got packet from %s:%i instead of %s:%i" %
+                                (remote_addr + peer))
+                    continue
+
+                data_len = int(data[:4], 16)
+                logger.debug("< %dB", data_len)
+                data = data[4:]
+                if len(data) != data_len:
+                    logger.warning("packet broken, expect %dB, got %dB", data_len, len(data))
+                    continue
+
+                inq.append(data)
+
+        for fd in w:
+            if fd == tun_fd and inq:
+                data = inq.popleft()
+                logger.debug("<< %dB", len(data))
+                os.write(tun_fd, data)
+
+            elif fd == sock and outq:
+                data = outq.popleft()
+                logger.debug(">> %dB", len(data))
+                sock.sendto('%04x' % len(data) + data, peer)
