@@ -31,13 +31,18 @@ def main(args):
         while 1:
             word, peer = sock.recvfrom(1500)
             if word == MAGIC_WORD:
-                logger.debug("handshake")
                 break
             logger.warning("bad magic word for %s:%i" % peer)
 
-        sock.sendto(MAGIC_WORD, peer)
+        while 1:
+            logger.info("handshake from %s:%i" % peer)
+            sock.sendto(MAGIC_WORD, peer)
 
-        proxy(tun.fd, sock, peer)
+            retval = proxy(tun.fd, sock, peer, break_on_packet=MAGIC_WORD)
+            if type(retval) is tuple and retval[0] == 'sentinel':
+                peer = retval[1]
+            else:
+                break
 
     except KeyboardInterrupt:
         logger.warning("user stop")

@@ -1,7 +1,6 @@
 import os
 import logging
 from select import select
-from collections import deque
 
 from myvpn.consts import DEFAULT_PORT
 
@@ -25,8 +24,7 @@ def encrypt(data):
 def decrypt(data):
     return data[::-1]
 
-def proxy(tun_fd, sock, peer):
-    inq, outq = deque(), deque()
+def proxy(tun_fd, sock, peer, break_on_packet=None):
     while 1:
         fd = select([tun_fd, sock], [], [])[0][0]
         if fd == tun_fd:
@@ -37,9 +35,13 @@ def proxy(tun_fd, sock, peer):
         else:
             data, remote_addr = sock.recvfrom(1504)
             if remote_addr != peer:
-                logger.warning("Got packet from %s:%i instead of %s:%i" %
-                               (remote_addr + peer))
-                continue
+                if data == break_on_packet:
+                    return 'sentinel', remote_addr
+                else:
+                    logger.warning("Got packet from %s:%i instead of %s:%i" %
+                                (remote_addr + peer))
+                    continue
+
             data_len = int(data[:4], 16)
             data = data[4:]
             if len(data) != data_len:
