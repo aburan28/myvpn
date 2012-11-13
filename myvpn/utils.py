@@ -22,7 +22,7 @@ def populate_common_argument_parser(parser):
 def proxy(tun_fd, sock, peer):
     inq, outq = deque(), deque()
     while 1:
-        r, w = select([tun_fd, sock], [tun_fd, sock], [])
+        r, w, x = select([tun_fd, sock], [tun_fd, sock], [])
 
         for fd in r:
             if fd == tun_fd:
