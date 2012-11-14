@@ -42,11 +42,13 @@ def main(args):
         logger.info("Connection with %s:%i established" % peer)
 
         gateway = get_default_gateway()
+        server_ip = gethostbyname(args.server)
+
         if args.down:
             atexit.register(on_down, args.down,
+                            server_ip=server_ip,
                             restore_gateway=gateway if args.default_gateway else None)
 
-        server_ip = gethostbyname(args.server)
         call(['route', 'delete', server_ip+'/32'])
         check_call(['route', 'add', server_ip+'/32', gateway])
 
@@ -76,11 +78,13 @@ def get_default_gateway():
     return gateway
 
 
-def on_down(script, restore_gateway=None):
+def on_down(script, server_ip, restore_gateway=None):
     if restore_gateway:
         logger.info("restore gateway to %s", restore_gateway)
         call(['route', 'delete', 'default'])
         call(['route', 'add', 'default', restore_gateway])
+
+    call(['route', 'delete', server_ip+'/32'])
 
     logger.info("Run down script")
     call([script])
