@@ -70,10 +70,10 @@ def main(args):
 def get_default_gateway():
     platform = get_platform()
     if platform == 'darwin':
-        output = getoutput("/usr/sbin/netstat -nr | grep default | head -n1 | awk '{ print $2 }'")
+        output = getoutput("netstat -nr | grep default | head -n1 | awk '{ print $2 }'")
         gateway = output.strip()
     else:
-        output = getoutput("/bin/netstat -nr | grep -e '^0.0.0.0' | head -n1 | awk '{ print $2 }'")
+        output = getoutput("netstat -nr | grep -e '^0.0.0.0' | head -n1 | awk '{ print $2 }'")
         gateway = output.strip()
     return gateway
 

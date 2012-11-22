@@ -25,11 +25,11 @@ class Tun(object):
         if platform == 'linux':
             iface = ioctl(self.fd, TUNSETIFF, struct.pack('16sH', 'tun%d', IFF_TUN|IFF_NO_PI))
             self.ifname = iface[:16].strip('\0')
-            check_call(['/sbin/ifconfig', self.ifname, self.ip, 'pointopoint',
+            check_call(['ifconfig', self.ifname, self.ip, 'pointopoint',
                         self.peer_ip, 'up'])
         else:
             self.ifname = self.device.split('/')[-1]
-            check_call(['/sbin/ifconfig', self.ifname, self.ip, self.peer_ip,
+            check_call(['ifconfig', self.ifname, self.ip, self.peer_ip,
                         'up'])
 
         logger.info("%s open", self.ifname)
