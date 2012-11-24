@@ -23,6 +23,7 @@ def main(args):
     call(['iptables', '-t', 'nat', '-D', 'POSTROUTING', '-s', netseg, '-j', 'MASQUERADE'])
     check_call(['iptables', '-t', 'nat', '-A', 'POSTROUTING', '-s', netseg, '-j', 'MASQUERADE'])
 
+    logger.info("listen at port %d", args.port)
     server = TCPServer(('0.0.0.0', args.port), MyHandlerFactory(tun))
     server.serve_forever()
 
@@ -30,12 +31,13 @@ def main(args):
 def MyHandlerFactory(tun):
     class MyHandler(BaseRequestHandler):
         def handle(self):
+            logger.info("client connected from %s:%i" % self.client_address)
             data = self.request.recv(len(MAGIC_WORD))
             if data != MAGIC_WORD:
                 logger.warning("bad magic word for %s:%i" % self.client_address)
                 return
 
-            logger.info("client connected from %s:%i" % self.client_address)
+            logger.info("handshaked")
             self.request.send(MAGIC_WORD)
 
             proxy(tun.fd, self.request)
