@@ -1,5 +1,5 @@
 import sys
-from socket import socket, AF_INET, SOCK_DGRAM, gethostbyname
+from socket import socket, gethostbyname
 import logging
 from commands import getoutput
 from subprocess import call, check_call
@@ -30,19 +30,20 @@ def main(args):
     tun = Tun(device=args.device, ip=args.ip, peer_ip=args.peer_ip)
     tun.open()
 
-    sock = socket(AF_INET, SOCK_DGRAM)
+    sock = socket()
     server_ip = gethostbyname(args.server)
 
     try:
-        sock.sendto(MAGIC_WORD, (server_ip, args.port))
-        word, peer = sock.recvfrom(1500)
-        if word != MAGIC_WORD:
-            logger.warning("Bad magic word for %s:%i" % peer)
+        sock.connect((server_ip, args.port))
+        sock.send(MAGIC_WORD)
+        data = sock.recv(len(MAGIC_WORD))
+        if data != MAGIC_WORD:
+            logger.warning("Handshake failed")
             sys.exit(2)
-        logger.info("Connection with %s:%i established" % peer)
+
+        logger.info("Connection with %s:%i established" % (server_ip, args.port))
 
         gateway = get_default_gateway()
-        server_ip = gethostbyname(args.server)
 
         if args.down:
             atexit.register(on_down, args.down,
@@ -61,7 +62,7 @@ def main(args):
             logger.info("Run up script")
             check_call(args.up)
 
-        proxy(tun.fd, sock, peer)
+        proxy(tun.fd, sock)
 
     except KeyboardInterrupt:
         logger.warning("Stopped by user")

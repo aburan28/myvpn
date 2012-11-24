@@ -35,6 +35,9 @@ def MyHandlerFactory(tun):
                 logger.warning("bad magic word for %s:%i" % self.client_address)
                 return
 
+            logger.info("client connected from %s:%i" % self.client_address)
+            self.request.send(MAGIC_WORD)
+
             proxy(tun.fd, self.request)
 
     return MyHandler
