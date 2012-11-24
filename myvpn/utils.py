@@ -1,6 +1,6 @@
 import os
 import logging
-from select import select
+from threading import Thread
 
 from myvpn.consts import DEFAULT_PORT
 
@@ -24,29 +24,29 @@ def encrypt(data):
 def decrypt(data):
     return data[::-1]
 
-def proxy(tun_fd, sock, peer, break_on_packet=None):
-    while 1:
-        fd = select([tun_fd, sock], [], [])[0][0]
-        if fd == tun_fd:
-            data = os.read(tun_fd, 1500)
-            data = encrypt(data)
-            logger.debug("> %dB", len(data))
-            sock.sendto('%04x' % len(data) + data, peer)
-        else:
-            data, remote_addr = sock.recvfrom(1504)
-            if remote_addr != peer:
-                if data == break_on_packet:
-                    return 'sentinel', remote_addr
-                else:
-                    logger.warning("Got packet from %s:%i instead of %s:%i" %
-                                (remote_addr + peer))
-                    continue
+def proxy(tun_fd, sock):
+    t1 = Thread(target=copy_fd_to_socket, args=(tun_fd, sock))
+    t1.setDaemont(True)
+    t1.start()
 
-            data_len = int(data[:4], 16)
-            data = data[4:]
-            if len(data) != data_len:
-                logger.warning("Got broken packet. expect %dB, got %dB", data_len, len(data))
-                continue
-            logger.debug("< %dB", data_len)
-            data = decrypt(data)
-            os.write(tun_fd, data)
+    copy_socket_to_fd(sock, tun_fd)
+
+    t1.join()
+
+def copy_fd_to_socket(fd, sock):
+    while 1:
+        data = os.read(fd, 1500)
+        data = encrypt(data)
+        logger.debug("> %dB", len(data))
+        sock.sendall('%04x' % len(data) + data)
+
+def copy_socket_to_fd(sock, fd):
+    while 1:
+        data_len = int(sock.recv(4), 16)
+        data = ''
+        while len(data) < data_len:
+            data += sock.recv(data_len - len(data))
+        logger.debug("< %dB", data_len)
+        data = decrypt(data)
+        os.write(fd, data)
+

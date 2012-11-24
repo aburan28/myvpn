@@ -1,5 +1,5 @@
 import logging
-from socket import socket, AF_INET, SOCK_DGRAM
+from SocketServer import TCPServer, BaseRequestHandler
 from subprocess import check_call, call
 
 from myvpn.tun import Tun
@@ -23,26 +23,18 @@ def main(args):
     call(['iptables', '-t', 'nat', '-D', 'POSTROUTING', '-s', netseg, '-j', 'MASQUERADE'])
     check_call(['iptables', '-t', 'nat', '-A', 'POSTROUTING', '-s', netseg, '-j', 'MASQUERADE'])
 
-    sock = socket(AF_INET, SOCK_DGRAM)
+    server = TCPServer(('0.0.0.0', args.port), MyHandlerFactory(tun))
+    server.serve_forever()
 
-    try:
-        sock.bind(('0.0.0.0', args.port))
 
-        while 1:
-            word, peer = sock.recvfrom(1500)
-            if word == MAGIC_WORD:
-                break
-            logger.warning("bad magic word for %s:%i" % peer)
+def MyHandlerFactory(tun):
+    class MyHandler(BaseRequestHandler):
+        def handle(self):
+            data = self.request.recv(len(MAGIC_WORD))
+            if data != MAGIC_WORD:
+                logger.warning("bad magic word for %s:%i" % self.client_address)
+                return
 
-        while 1:
-            logger.info("handshake from %s:%i" % peer)
-            sock.sendto(MAGIC_WORD, peer)
+            proxy(tun.fd, self.request)
 
-            retval = proxy(tun.fd, sock, peer, break_on_packet=MAGIC_WORD)
-            if type(retval) is tuple and retval[0] == 'sentinel':
-                peer = retval[1]
-            else:
-                break
-
-    except KeyboardInterrupt:
-        logger.warning("user stop")
+    return MyHandler
