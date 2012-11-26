@@ -11,10 +11,7 @@ logger = logging.getLogger(__name__)
 def populate_argument_parser(parser):
     server_mode = '--server' in sys.argv
 
-    if server_mode:
-        parser.add_argument('--server', action='store_true', help="server mode")
-
-    else:
+    if not server_mode:
         parser.add_argument('host')
         parser.add_argument('--path', default='myvpn', help="path to myvpn on server")
         parser.add_argument('--default-gateway', action='store_true',
@@ -24,6 +21,7 @@ def populate_argument_parser(parser):
         parser.add_argument('--down',
                             help="script to run at connection closed")
 
+    parser.add_argument('--server', action='store_true', help="server mode")
     parser.add_argument('-w', dest='tun')
     parser.add_argument('client_tun_ip', nargs='?', default='10.1.1.1')
     parser.add_argument('server_tun_ip', nargs='?', default='10.1.1.2')
@@ -45,7 +43,7 @@ def main(args):
 
     while True:
         retval = call(['ifconfig', local_tun, args.client_tun_ip, args.server_tun_ip,
-                       'netmask', args.tun_netmask])
+                       'netmask', args.tun_netmask, 'up'])
         if retval == 0:
             break
         sleep(1)
@@ -73,8 +71,8 @@ def main(args):
 
 def server(args):
     local_tun, remote_tun = ['tun%s' % x for x in args.tun.split(':')]
-    check_call(['ifconfig', remote_tun, args.server_tun_ip,
-                args.client_tun_ip, 'netmask', args.tun_netmask])
+    check_call(['ifconfig', remote_tun, args.server_tun_ip, 'pointopoint',
+                args.client_tun_ip, 'netmask', args.tun_netmask, 'up'])
     netseg = '.'.join(args.server_tun_ip.split('.')[:3] + ['0/24'])
     call(['iptables', '-t', 'nat', '-D', 'POSTROUTING', '-s', netseg, '-j',
           'MASQUERADE'])
