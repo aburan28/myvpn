@@ -7,6 +7,7 @@ def main():
     subcommands = [
         ('server', 'server', "Run in server mode"),
         ('client', 'client', "Run in client mode"),
+        ('ssh', 'ssh', "Run in ssh tunnel"),
     ]
     for command, module_name, help_text in subcommands:
         subparser = subparsers.add_parser(command, help=help_text)
