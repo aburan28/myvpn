@@ -23,9 +23,8 @@ def populate_argument_parser(parser):
 
     parser.add_argument('--server', action='store_true', help="server mode")
     parser.add_argument('-w', dest='tun')
-    parser.add_argument('client_tun_ip', nargs='?', default='10.1.1.1')
-    parser.add_argument('server_tun_ip', nargs='?', default='10.1.1.2')
-    parser.add_argument('tun_netmask', nargs='?', default='255.255.255.252')
+    parser.add_argument('client_tun_ip', nargs='?', default='192.168.67.2')
+    parser.add_argument('server_tun_ip', nargs='?', default='192.168.67.1')
 
 
 def main(args):
@@ -37,13 +36,13 @@ def main(args):
 
     cmd = ['ssh', '-w', args.tun, host_ip, args.path, 'ssh',
                    '--server', '-w', args.tun, args.client_tun_ip,
-                   args.server_tun_ip, args.tun_netmask]
+                   args.server_tun_ip]
     logger.debug("Run: %s", cmd)
     ssh_p = Popen(cmd)
 
     while True:
-        retval = call(['ifconfig', local_tun, args.client_tun_ip, args.server_tun_ip,
-                       'netmask', args.tun_netmask, 'up'])
+        retval = call(['ifconfig', local_tun, args.client_tun_ip,
+                       args.server_tun_ip, 'up'])
         if retval == 0:
             break
         sleep(1)
@@ -72,7 +71,7 @@ def main(args):
 def server(args):
     local_tun, remote_tun = ['tun%s' % x for x in args.tun.split(':')]
     check_call(['ifconfig', remote_tun, args.server_tun_ip, 'pointopoint',
-                args.client_tun_ip, 'netmask', args.tun_netmask, 'up'])
+                args.client_tun_ip, 'up'])
     netseg = '.'.join(args.server_tun_ip.split('.')[:3] + ['0/24'])
     call(['iptables', '-t', 'nat', '-D', 'POSTROUTING', '-s', netseg, '-j',
           'MASQUERADE'])
