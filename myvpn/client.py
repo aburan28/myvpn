@@ -32,9 +32,11 @@ def main(args):
 
     sock = socket()
     server_ip = gethostbyname(args.server)
+    logger.info("%s resolved to %s", args.server, server_ip)
 
     try:
         sock.connect((server_ip, args.port))
+        logger.info("connected to %s:%i" % (server_ip, args.port))
         sock.send(MAGIC_WORD)
         data = sock.recv(len(MAGIC_WORD))
         if data != MAGIC_WORD:
