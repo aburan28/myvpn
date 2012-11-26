@@ -1,3 +1,4 @@
+import sys
 from subprocess import check_call, Popen, call
 from commands import getoutput
 import atexit
@@ -8,19 +9,25 @@ from time import sleep
 logger = logging.getLogger(__name__)
 
 def populate_argument_parser(parser):
-    parser.add_argument('host')
+    server_mode = '--server' in sys.argv
+
+    if server_mode:
+        parser.add_argument('--server', action='store_true', help="server mode")
+
+    else:
+        parser.add_argument('host')
+        parser.add_argument('--path', default='myvpn', help="path to myvpn on server")
+        parser.add_argument('--default-gateway', action='store_true',
+                            help="use vpn as default gateway")
+        parser.add_argument('--up',
+                            help="script to run at connection")
+        parser.add_argument('--down',
+                            help="script to run at connection closed")
+
     parser.add_argument('-w', dest='tun')
-    parser.add_argument('--path', default='myvpn', help="path to myvpn on server")
-    parser.add_argument('--server', action='store_true', help="server mode")
     parser.add_argument('client_tun_ip', nargs='?', default='10.1.1.1')
     parser.add_argument('server_tun_ip', nargs='?', default='10.1.1.2')
     parser.add_argument('tun_netmask', nargs='?', default='255.255.255.252')
-    parser.add_argument('--default-gateway', action='store_true',
-                        help="use vpn as default gateway")
-    parser.add_argument('--up',
-                        help="script to run at connection")
-    parser.add_argument('--down',
-                        help="script to run at connection closed")
 
 
 def main(args):
@@ -30,9 +37,11 @@ def main(args):
     host_ip = gethostbyname(args.host)
     local_tun, remote_tun = ['tun%s' % x for x in args.tun.split(':')]
 
-    ssh_p = Popen(['ssh', '-w', args.tun, host_ip, args.path, 'ssh',
+    cmd = ['ssh', '-w', args.tun, host_ip, args.path, 'ssh',
                    '--server', '-w', args.tun, args.client_tun_ip,
-                   args.server_tun_ip, args.tun_netmask])
+                   args.server_tun_ip, args.tun_netmask]
+    logger.debug("Run: %s", cmd)
+    ssh_p = Popen(cmd)
 
     while True:
         retval = call(['ifconfig', local_tun, args.client_tun_ip, args.server_tun_ip,
