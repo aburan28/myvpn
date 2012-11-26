@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 def populate_argument_parser(parser):
     parser.add_argument('host')
     parser.add_argument('-w', dest='tun')
-    parser.add_argument('path', help="path to myvpn on server")
+    parser.add_argument('--path', default='myvpn', help="path to myvpn on server")
     parser.add_argument('--server', action='store_true', help="server mode")
     parser.add_argument('client_tun_ip', nargs='?', default='10.1.1.1')
     parser.add_argument('server_tun_ip', nargs='?', default='10.1.1.2')
