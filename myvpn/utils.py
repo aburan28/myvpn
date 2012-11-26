@@ -26,7 +26,7 @@ def decrypt(data):
 
 def proxy(tun_fd, sock):
     t1 = Thread(target=copy_fd_to_socket, args=(tun_fd, sock))
-    t1.setDaemont(True)
+    t1.setDaemon(True)
     t1.start()
 
     copy_socket_to_fd(sock, tun_fd)
