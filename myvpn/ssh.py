@@ -3,6 +3,7 @@ from commands import getoutput
 import atexit
 import logging
 from socket import gethostbyname
+from time import sleep
 
 logger = logging.getLogger(__name__)
 
@@ -11,9 +12,9 @@ def populate_argument_parser(parser):
     parser.add_argument('-w', dest='tun')
     parser.add_argument('path', help="path to myvpn on server")
     parser.add_argument('--server', action='store_true', help="server mode")
-    parser.add_argument('client-tun-ip', nargs='?', default='10.1.1.1')
-    parser.add_argument('server-tun-ip', nargs='?', default='10.1.1.2')
-    parser.add_argument('tun-netmask', nargs='?', default='255.255.255.252')
+    parser.add_argument('client_tun_ip', nargs='?', default='10.1.1.1')
+    parser.add_argument('server_tun_ip', nargs='?', default='10.1.1.2')
+    parser.add_argument('tun_netmask', nargs='?', default='255.255.255.252')
     parser.add_argument('--default-gateway', action='store_true',
                         help="use vpn as default gateway")
     parser.add_argument('--up',
@@ -32,8 +33,13 @@ def main(args):
     ssh_p = Popen(['ssh', '-w', args.tun, host_ip, args.path, 'ssh',
                    '--server', '-w', args.tun, args.client_tun_ip,
                    args.server_tun_ip, args.tun_netmask])
-    check_call(['ifconfig', local_tun, args.client_tun_ip, args.server_tun_ip,
-                'netmask', args.tun_netmask])
+
+    while True:
+        retval = call(['ifconfig', local_tun, args.client_tun_ip, args.server_tun_ip,
+                       'netmask', args.tun_netmask])
+        if retval == 0:
+            break
+        sleep(1)
 
     gateway = get_default_gateway()
 
