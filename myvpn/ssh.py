@@ -25,6 +25,8 @@ def populate_argument_parser(parser):
     parser.add_argument('-w', dest='tun')
     parser.add_argument('client_tun_ip', nargs='?', default='192.168.67.2')
     parser.add_argument('server_tun_ip', nargs='?', default='192.168.67.1')
+    parser.add_argument('-l', '--login-name')
+    parser.add_argument('-i', '--identify-file')
 
 
 def main(args):
@@ -34,15 +36,22 @@ def main(args):
     host_ip = gethostbyname(args.host)
     local_tun, remote_tun = ['tun%s' % x for x in args.tun.split(':')]
 
-    cmd = ['ssh', '-w', args.tun, host_ip, args.path, 'ssh',
-                   '--server', '-w', args.tun, args.client_tun_ip,
-                   args.server_tun_ip]
-    logger.debug("Run: %s", cmd)
+    ssh_cmd = ['ssh', '-w', args.tun]
+    if args.login_name:
+        ssh_cmd += ['-l', args.login_name]
+    if args.identify_file:
+        ssh_cmd += ['-i', args.identify_file]
+    ssh_cmd.append(args.host)
+    remote_cmd = ['sudo', args.path, 'ssh', '--server', '-w', args.tun,
+                  args.client_tun_ip, args.server_tun_ip]
+    cmd = ssh_cmd + remote_cmd
     ssh_p = Popen(cmd)
+    atexit.register(ssh_p.terminate)
 
     while True:
         retval = call(['ifconfig', local_tun, args.client_tun_ip,
-                       args.server_tun_ip, 'up'])
+                       args.server_tun_ip, 'up'],
+                      stderr=None if args.verbose else open('/dev/null', 'w'))
         if retval == 0:
             break
         sleep(1)
@@ -50,16 +59,17 @@ def main(args):
     gateway = get_default_gateway()
 
     if args.down:
-        atexit.register(on_down, args.down, server_ip=args.server_tun_ip,
-                        restore_gateway=gateway if args.default_gateway else None)
+        atexit.register(on_down, args.down)
 
     call(['route', 'delete', host_ip+'/32'])
     check_call(['route', 'add', host_ip+'/32', gateway])
+    atexit.register(call, ['route', 'delete', host_ip+'/32'])
 
     if args.default_gateway:
         logger.info("set default gateway")
         call(['route', 'delete', 'default'])
-        check_call(['route', 'add', 'default', args.tun_server_tun_ip])
+        check_call(['route', 'add', 'default', args.server_tun_ip])
+        atexit.register(restore_gateway, gateway)
 
     if args.up:
         logger.info("Run up script")
@@ -67,6 +77,10 @@ def main(args):
 
     ssh_p.wait()
 
+def restore_gateway(gateway):
+    logger.info("restore gateway to %s", gateway)
+    call(['route', 'delete', 'default'])
+    call(['route', 'add', 'default', gateway])
 
 def server(args):
     local_tun, remote_tun = ['tun%s' % x for x in args.tun.split(':')]
@@ -85,13 +99,6 @@ def get_default_gateway():
     return gateway
 
 
-def on_down(script, server_ip, restore_gateway=None):
-    if restore_gateway:
-        logger.info("restore gateway to %s", restore_gateway)
-        call(['route', 'delete', 'default'])
-        call(['route', 'add', 'default', restore_gateway])
-
-    call(['route', 'delete', server_ip+'/32'])
-
+def on_down(script):
     logger.info("Run down script")
-    call([script])
+    call([script], stdout=open('/dev/null', 'w'))
