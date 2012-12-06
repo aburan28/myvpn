@@ -23,8 +23,8 @@ def populate_argument_parser(parser):
 
     parser.add_argument('--server', action='store_true', help="server mode")
     parser.add_argument('-w', dest='tun')
-    parser.add_argument('client_tun_ip', nargs='?', default='192.168.67.2')
-    parser.add_argument('server_tun_ip', nargs='?', default='192.168.67.1')
+    parser.add_argument('client_tun_ip', nargs='?', default='192.168.5.2')
+    parser.add_argument('server_tun_ip', nargs='?', default='192.168.5.1')
     parser.add_argument('-l', '--login-name')
     parser.add_argument('-i', '--identify-file')
 
