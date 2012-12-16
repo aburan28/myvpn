@@ -14,10 +14,8 @@ logger = logging.getLogger(__name__)
 def populate_argument_parser(parser):
     populate_common_argument_parser(parser)
     parser.add_argument('--server', required=True)
-    parser.add_argument('--ip', default='192.168.5.2',
-                        help="[default: %(default)s]")
-    parser.add_argument('--peer-ip', default='192.168.5.1',
-                        help="[default: %(default)s]")
+    parser.add_argument('--ip', default='192.168.5.2')
+    parser.add_argument('--peer-ip', default='192.168.5.1')
     parser.add_argument('--default-gateway', action='store_true',
                         help="use vpn as default gateway")
     parser.add_argument('--up',

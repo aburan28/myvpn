@@ -10,10 +10,8 @@ logger = logging.getLogger(__name__)
 
 def populate_argument_parser(parser):
     populate_common_argument_parser(parser)
-    parser.add_argument('--ip', default='192.168.5.1',
-                        help="[default: %(default)s]")
-    parser.add_argument('--peer-ip', default='192.168.5.2',
-                        help="[default: %(default)s]")
+    parser.add_argument('--ip', default='192.168.5.1')
+    parser.add_argument('--peer-ip', default='192.168.5.2')
 
 def main(args):
     tun = Tun(device=args.device, ip=args.ip, peer_ip=args.peer_ip)

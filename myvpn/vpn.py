@@ -1,8 +1,8 @@
-from argparse import ArgumentParser
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import logging
 
 def main():
-    parser = ArgumentParser()
+    parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
     subparsers = parser.add_subparsers(title="commands")
     subcommands = [
         ('server', 'server', "Run in server mode"),
