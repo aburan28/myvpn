@@ -6,6 +6,7 @@ from argparse import ArgumentTypeError
 from subprocess import call, check_call
 from wsgiref.simple_server import make_server
 import logging
+import urllib2
 
 from myvpn.tun import Tun
 from myvpn.utils import get_platform
@@ -28,6 +29,7 @@ def ip(s):
 
 def populate_argument_parser(parser):
     server_mode = '--server' in sys.argv
+    parser.add_argument('--server', action='store_true', help="server mode")
     platform = get_platform()
     default_device = '/dev/tun5' if platform == 'darwin' else '/dev/net/tun'
     parser.add_argument('--device', default=default_device, help="TUN device")

@@ -5,9 +5,8 @@ def main():
     parser = ArgumentParser(formatter_class=ArgumentDefaultsHelpFormatter)
     subparsers = parser.add_subparsers(title="commands")
     subcommands = [
-        ('server', 'server', "Run in server mode"),
-        ('client', 'client', "Run in client mode"),
         ('ssh', 'ssh', "Run in ssh tunnel"),
+        ('http', 'http', "Run in http tunnel"),
     ]
     for command, module_name, help_text in subcommands:
         subparser = subparsers.add_parser(command, help=help_text)
