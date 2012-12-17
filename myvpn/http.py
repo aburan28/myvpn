@@ -143,4 +143,6 @@ def make_app(tun):
             for data in read_connection(f):
                 os.write(tun.fd, data)
 
+    return app
+
 
