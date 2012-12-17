@@ -66,7 +66,7 @@ def server_main(args, tun):
     port = int(port)
 
     class HTTPServer(ThreadingMixIn, TCPServer):
-        pass
+        allow_reuse_address = True
 
     class Handler(StreamRequestHandler):
         def handle(self):
