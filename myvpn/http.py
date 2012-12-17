@@ -3,7 +3,7 @@ from zlib import compress, decompress
 from struct import pack, unpack
 from argparse import ArgumentTypeError
 from subprocess import call, check_call
-from wsgiref.simple_server import make_server
+from SocketServer import TCPServer, ThreadingMixIn, StreamRequestHandler
 import logging
 import urlparse
 import socket
@@ -60,10 +60,31 @@ def server_main(args, tun):
     call(['iptables', '-t', 'nat', '-D', 'POSTROUTING', '-s', netseg, '-j', 'MASQUERADE'])
     check_call(['iptables', '-t', 'nat', '-A', 'POSTROUTING', '-s', netseg, '-j', 'MASQUERADE'])
 
-    app = make_app(tun)
     host, port = args.bind.split(':')
     port = int(port)
-    httpd = make_server(host, port, app)
+
+    class HTTPServer(ThreadingMixIn, TCPServer):
+        pass
+
+    class Handler(StreamRequestHandler):
+        def handle(self):
+            method = self.rfile.readline().split()[0]
+            while self.rfile.readline().strip():
+                pass
+            if method == 'GET':
+                self.wfile.write('HTTP/1.1 200 OK\r\n')
+                self.wfile.write('Server: python\r\n')
+                self.wfile.write('Content-Type: audio/mpeg\r\n')
+                self.wfile.write('\r\n')
+                for data in read_tun(tun):
+                    self.wfile.write(data)
+                    self.wfile.flush()
+
+            elif method == 'POST':
+                for data in read_connection(self.rfile):
+                    os.write(tun.fd, data)
+
+    httpd = HTTPServer((host, port), Handler)
     logger.warning("Serving on %s:%d", host, port)
     httpd.serve_forever()
 
@@ -128,21 +149,5 @@ def read_tun(tun):
         data = os.read(tun.fd, 1500)
         data = encrypt(data)
         yield pack('H', len(data)) + data
-
-
-def make_app(tun):
-    def app(environ, start_response):
-        method = environ['REQUEST_METHOD']
-        if method == 'GET':
-            start_response('200 OK', [('Content-Type', 'audio/mpeg')])
-            for data in read_tun(tun):
-                yield data
-
-        elif method == 'POST':
-            f = environ['wsgi.input']
-            for data in read_connection(f):
-                os.write(tun.fd, data)
-
-    return app
 
 
