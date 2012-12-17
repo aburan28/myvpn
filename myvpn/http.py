@@ -71,6 +71,7 @@ def server_main(args, tun):
     class Handler(StreamRequestHandler):
         def handle(self):
             method = self.rfile.readline().split()[0]
+            logger.info(method)
             while self.rfile.readline().strip():
                 pass
             if method == 'GET':
@@ -106,7 +107,7 @@ def client_main(args, tun):
     def get():
         sock = socket.socket()
         sock.connect((host, port))
-        logger.info("GET %s", url.path)
+        logger.info("GET %s", args.url)
         sock.sendall('GET %s HTTP/1.1\r\n' % url.path)
         sock.sendall('Host: %s\r\n' % url.netloc)
         sock.sendall('Accept: */*\r\n')
@@ -120,7 +121,7 @@ def client_main(args, tun):
     def post():
         sock = socket.socket()
         sock.connect((host, port))
-        logger.info("POST %s", url.path)
+        logger.info("POST %s", args.url)
         sock.sendall('POST %s HTTP/1.1\r\n' % url.path)
         sock.sendall('Host: %s\r\n' % url.netloc)
         sock.sendall('Accept: */*\r\n')
