@@ -9,7 +9,8 @@ def main():
         ('http', 'http', "Run in http tunnel"),
     ]
     for command, module_name, help_text in subcommands:
-        subparser = subparsers.add_parser(command, help=help_text)
+        subparser = subparsers.add_parser(command, help=help_text,
+                                          formatter_class=ArgumentDefaultsHelpFormatter)
         subparser.add_argument('-v', '--verbose', action='store_true',
                                help="enable additional output")
         module = __import__(module_name, globals(), locals(),
