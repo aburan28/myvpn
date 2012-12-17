@@ -67,6 +67,7 @@ def server_main(args, tun):
 
     class HTTPServer(ThreadingMixIn, TCPServer):
         allow_reuse_address = True
+        daemon_threads = True
 
     class Handler(StreamRequestHandler):
         def handle(self):
