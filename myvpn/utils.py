@@ -1,6 +1,9 @@
 import os
 import logging
 from threading import Thread
+from subprocess import call, check_call
+import atexit
+from commands import getoutput
 
 from myvpn.consts import DEFAULT_PORT
 
@@ -49,4 +52,17 @@ def copy_socket_to_fd(sock, fd):
         logger.debug("< %dB", data_len)
         data = decrypt(data)
         os.write(fd, data)
+
+
+def add_route(ip, gateway):
+    call(['route', 'delete', ip+'/32'])
+    check_call(['route', 'add', ip+'/32', gateway])
+    atexit.register(call, ['route', 'delete', ip+'/32'])
+
+
+def get_default_gateway():
+    output = getoutput("netstat -nr | grep default | head -n1 | awk '{ print $2 }'")
+    gateway = output.strip()
+    return gateway
+
 

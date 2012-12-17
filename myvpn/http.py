@@ -11,8 +11,8 @@ import socket
 import threading
 import errno
 
-from myvpn.tun import Tun
-from myvpn.utils import get_platform
+from .tun import Tun
+from .utils import get_platform, add_route, get_default_gateway
 
 FAKE_HEAD = b'ID3\x02\x00\x00\x00\x00'
 
@@ -79,11 +79,13 @@ def server_main(args, tun):
                 self.wfile.write('Content-Type: audio/mpeg\r\n')
                 self.wfile.write('\r\n')
                 for data in read_tun(tun):
+                    logger.debug('> %dB', len(data))
                     self.wfile.write(data)
                     self.wfile.flush()
 
             elif method == 'POST':
                 for data in read_connection(self.rfile):
+                    logger.debug('< %dB', len(data))
                     os.write(tun.fd, data)
 
     httpd = HTTPServer((host, port), Handler)
@@ -99,6 +101,8 @@ def client_main(args, tun):
     else:
         host, port = url.netloc, 80
 
+    host_ip = socket.gethostbyname(host)
+
     def get():
         sock = socket.socket()
         sock.connect((host, port))
@@ -110,6 +114,7 @@ def client_main(args, tun):
 
         f = sock.makefile('r', 0)
         for data in read_connection(f):
+            logger.debug('< %dB', len(data))
             os.write(tun.fd, data)
 
     def post():
@@ -122,6 +127,7 @@ def client_main(args, tun):
         sock.sendall('\r\n')
 
         for data in read_tun(tun):
+            logger.debug('> %dB', len(data))
             sock.sendall(data)
 
     t1 = threading.Thread(target=get)
@@ -130,6 +136,9 @@ def client_main(args, tun):
     t2.setDaemon(True)
     t1.start()
     t2.start()
+
+    gateway = get_default_gateway()
+    add_route(host_ip, gateway)
 
     try:
         while t1.is_alive() and t2.is_alive():

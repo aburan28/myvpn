@@ -1,10 +1,11 @@
 import sys
 from subprocess import check_call, Popen, call
-from commands import getoutput
 import atexit
 import logging
 from socket import gethostbyname
 from time import sleep
+
+from .utils import add_route, get_default_gateway
 
 logger = logging.getLogger(__name__)
 
@@ -61,9 +62,7 @@ def main(args):
     if args.down:
         atexit.register(on_down, args.down)
 
-    call(['route', 'delete', host_ip+'/32'])
-    check_call(['route', 'add', host_ip+'/32', gateway])
-    atexit.register(call, ['route', 'delete', host_ip+'/32'])
+    add_route(host_ip, gateway)
 
     if args.default_gateway:
         logger.info("set default gateway")
@@ -91,12 +90,6 @@ def server(args):
           'MASQUERADE'])
     check_call(['iptables', '-t', 'nat', '-A', 'POSTROUTING', '-s', netseg,
                 '-j', 'MASQUERADE'])
-
-
-def get_default_gateway():
-    output = getoutput("netstat -nr | grep default | head -n1 | awk '{ print $2 }'")
-    gateway = output.strip()
-    return gateway
 
 
 def on_down(script):
