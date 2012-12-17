@@ -1,4 +1,5 @@
 import os
+import time
 from zlib import compress, decompress
 from struct import pack, unpack
 from argparse import ArgumentTypeError
@@ -8,6 +9,7 @@ import logging
 import urlparse
 import socket
 import threading
+import errno
 
 from myvpn.tun import Tun
 from myvpn.utils import get_platform
@@ -120,6 +122,9 @@ def client_main(args, tun):
         for data in read_tun(tun):
             sock.sendall(data)
 
+    post()
+    return
+
     t1 = threading.Thread(target=get)
     t2 = threading.Thread(target=post)
     t1.start()
@@ -135,10 +140,20 @@ def decrypt(data):
     return decompress(data[::-1])
 
 def read_connection(f):
-    f.read(len(FAKE_HEAD))
+    data = f.read(len(FAKE_HEAD))
+    if data != FAKE_HEAD:
+        return
+
     while True:
-        data_len = unpack('H', f.read(2))[0]
+        data_len = f.read(2)
+        if not data_len:
+            break
+
+        data_len = unpack('H', data_len)[0]
         data = f.read(data_len)
+        if len(data) < data_len:
+            break
+
         data = decrypt(data)
         yield data
 
@@ -146,7 +161,12 @@ def read_connection(f):
 def read_tun(tun):
     yield FAKE_HEAD
     while True:
-        data = os.read(tun.fd, 1500)
+        try:
+            data = os.read(tun.fd, 1500)
+        except OSError, e:
+            if e.errno == errno.EAGAIN:
+                time.sleep(1)
+                continue
         data = encrypt(data)
         yield pack('H', len(data)) + data
 
