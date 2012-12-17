@@ -102,7 +102,8 @@ def client_main(args, tun):
     def get():
         sock = socket.socket()
         sock.connect((host, port))
-        sock.sendall('GET /%s HTTP/1.1\r\n' % url.path)
+        logger.info("GET %s", url.path)
+        sock.sendall('GET %s HTTP/1.1\r\n' % url.path)
         sock.sendall('Host: %s\r\n' % url.netloc)
         sock.sendall('Accept: */*\r\n')
         sock.sendall('\r\n')
@@ -114,7 +115,8 @@ def client_main(args, tun):
     def post():
         sock = socket.socket()
         sock.connect((host, port))
-        sock.sendall('POST /%s HTTP/1.1\r\n' % url.path)
+        logger.info("POST %s", url.path)
+        sock.sendall('POST %s HTTP/1.1\r\n' % url.path)
         sock.sendall('Host: %s\r\n' % url.netloc)
         sock.sendall('Accept: */*\r\n')
         sock.sendall('\r\n')
@@ -122,16 +124,18 @@ def client_main(args, tun):
         for data in read_tun(tun):
             sock.sendall(data)
 
-    post()
-    return
-
     t1 = threading.Thread(target=get)
+    t1.setDaemon(True)
     t2 = threading.Thread(target=post)
+    t2.setDaemon(True)
     t1.start()
     t2.start()
-    t1.join()
-    t2.join()
 
+    try:
+        while t1.is_alive() and t2.is_alive():
+            time.sleep(5)
+    except KeyboardInterrupt:
+        pass
 
 def encrypt(data):
     return compress(data)[::-1]
