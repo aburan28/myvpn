@@ -49,7 +49,7 @@ def main(args):
     tun = Tun(args.device, args.ip, args.peer_ip)
     tun.open()
 
-    if args.server:
+    if args.mode == 'server':
         server_main(args, tun)
     else:
         client_main(args, tun)
