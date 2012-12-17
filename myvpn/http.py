@@ -70,24 +70,29 @@ def server_main(args, tun):
 
     class Handler(StreamRequestHandler):
         def handle(self):
-            method = self.rfile.readline().split()[0]
-            logger.info(method)
-            while self.rfile.readline().strip():
-                pass
-            if method == 'GET':
-                self.wfile.write('HTTP/1.1 200 OK\r\n')
-                self.wfile.write('Server: python\r\n')
-                self.wfile.write('Content-Type: audio/mpeg\r\n')
-                self.wfile.write('\r\n')
-                for data in read_tun(tun):
-                    logger.debug('> %dB', len(data))
-                    self.wfile.write(data)
-                    self.wfile.flush()
+            line = self.rfile.readline().strip()
+            logger.info("%s: %s", self.client_address, line)
+            try:
+                method = line.split()[0]
+                while self.rfile.readline().strip():
+                    pass
+                if method == 'GET':
+                    self.wfile.write('HTTP/1.1 200 OK\r\n')
+                    self.wfile.write('Server: python\r\n')
+                    self.wfile.write('Content-Type: audio/mpeg\r\n')
+                    self.wfile.write('\r\n')
+                    for data in read_tun(tun):
+                        logger.debug('> %dB', len(data))
+                        self.wfile.write(data)
+                        self.wfile.flush()
 
-            elif method == 'POST':
-                for data in read_connection(self.rfile):
-                    logger.debug('< %dB', len(data))
-                    os.write(tun.fd, data)
+                elif method == 'POST':
+                    for data in read_connection(self.rfile):
+                        logger.debug('< %dB', len(data))
+                        os.write(tun.fd, data)
+
+            finally:
+                logger.info("%s: disconnected", self.client_address)
 
     httpd = HTTPServer((host, port), Handler)
     logger.warning("Serving on %s:%d", host, port)
