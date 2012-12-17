@@ -1,12 +1,13 @@
 import os
-import sys
 from zlib import compress, decompress
 from struct import pack, unpack
 from argparse import ArgumentTypeError
 from subprocess import call, check_call
 from wsgiref.simple_server import make_server
 import logging
-import urllib2
+import urlparse
+import socket
+import threading
 
 from myvpn.tun import Tun
 from myvpn.utils import get_platform
@@ -28,16 +29,20 @@ def ip(s):
 
 
 def populate_argument_parser(parser):
-    server_mode = '--server' in sys.argv
-    parser.add_argument('--server', action='store_true', help="server mode")
+    parser.add_argument('--mode', choices=['server', 'client'],
+                        default='client')
     platform = get_platform()
     default_device = '/dev/tun5' if platform == 'darwin' else '/dev/net/tun'
     parser.add_argument('--device', default=default_device, help="TUN device")
     parser.add_argument('--ip', type=ip)
     parser.add_argument('--peer-ip', type=ip)
 
-    if server_mode:
-        parser.add_argument('-b', '--bind', default='127.0.0.1:2504')
+    server_group = parser.add_argument_group('server mode only')
+    server_group.add_argument('-b', '--bind', default='127.0.0.1:2504',
+                              help="interface to listen")
+
+    client_group = parser.add_argument_group('client mode only')
+    client_group.add_argument('--url', help="server url")
 
 
 def main(args):
@@ -64,7 +69,42 @@ def server_main(args, tun):
 
 
 def client_main(args, tun):
-    pass
+    url = urlparse.urlparse(args.url)
+    if ':' in url.netloc:
+        host, port = url.netloc.split(':')
+        port = int(port)
+    else:
+        host, port = url.netloc, 80
+
+    def get():
+        sock = socket.socket()
+        sock.connect((host, port))
+        sock.sendall('GET /%s HTTP/1.1\r\n' % url.path)
+        sock.sendall('Host: %s\r\n' % url.netloc)
+        sock.sendall('Accept: */*\r\n')
+        sock.sendall('\r\n')
+
+        f = sock.makefile('r', 0)
+        for data in read_connection(f):
+            os.write(tun.fd, data)
+
+    def post():
+        sock = socket.socket()
+        sock.connect((host, port))
+        sock.sendall('POST /%s HTTP/1.1\r\n' % url.path)
+        sock.sendall('Host: %s\r\n' % url.netloc)
+        sock.sendall('Accept: */*\r\n')
+        sock.sendall('\r\n')
+
+        for data in read_tun(tun):
+            sock.sendall(data)
+
+    t1 = threading.Thread(target=get)
+    t2 = threading.Thread(target=post)
+    t1.start()
+    t2.start()
+    t1.join()
+    t2.join()
 
 
 def encrypt(data):
@@ -73,24 +113,34 @@ def encrypt(data):
 def decrypt(data):
     return decompress(data[::-1])
 
+def read_connection(f):
+    f.read(len(FAKE_HEAD))
+    while True:
+        data_len = unpack('H', f.read(2))[0]
+        data = f.read(data_len)
+        data = decrypt(data)
+        yield data
+
+
+def read_tun(tun):
+    yield FAKE_HEAD
+    while True:
+        data = os.read(tun.fd, 1500)
+        data = encrypt(data)
+        yield pack('H', len(data)) + data
+
+
 def make_app(tun):
     def app(environ, start_response):
         method = environ['REQUEST_METHOD']
         if method == 'GET':
             start_response('200 OK', [('Content-Type', 'audio/mpeg')])
-            yield FAKE_HEAD
-            while True:
-                data = os.read(tun.fd, 1500)
-                data = encrypt(data)
-                yield pack('H', len(data)) + data
+            for data in read_tun(tun):
+                yield data
 
         elif method == 'POST':
             f = environ['wsgi.input']
-            f.read(len(FAKE_HEAD))
-            while True:
-                data_len = unpack('H', f.read(2))[0]
-                data = f.read(data_len)
-                data = decrypt(data)
+            for data in read_connection(f):
                 os.write(tun.fd, data)
 
 
