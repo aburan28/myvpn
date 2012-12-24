@@ -10,9 +10,11 @@ import urlparse
 import socket
 import threading
 import errno
+import atexit
 
 from .tun import Tun
-from .utils import get_platform, add_route, get_default_gateway
+from .utils import get_platform, add_route, get_default_gateway, \
+        restore_gateway
 
 FAKE_HEAD = b'ID3\x02\x00\x00\x00\x00'
 
@@ -45,6 +47,10 @@ def populate_argument_parser(parser):
 
     client_group = parser.add_argument_group('client mode only')
     client_group.add_argument('--url', help="server url")
+    client_group.add_argument('--default-gateway', action='store_true',
+                              help="use vpn as default gateway")
+    client_group.add_argument('--up', help="script to run at connection")
+    client_group.add_argument('--down', help="script to run at disconnection")
 
 
 def main(args):
@@ -93,7 +99,7 @@ def server_main(args, tun):
                         os.write(tun.fd, data)
 
             finally:
-                logger.info("%s: disconnected", self.client_address)
+                logger.info("%s %s: disconnected", self.client_address, method)
 
     httpd = HTTPServer((host, port), Handler)
     logger.warning("Serving on %s:%d", host, port)
@@ -120,9 +126,15 @@ def client_main(args, tun):
         sock.sendall('\r\n')
 
         f = sock.makefile('r', 0)
+        while f.readline().strip():
+            # read until blank line
+            pass
+
         for data in read_connection(f):
             logger.debug('< %dB', len(data))
             os.write(tun.fd, data)
+
+        logger.warning("quit get")
 
     def post():
         sock = socket.socket()
@@ -137,6 +149,9 @@ def client_main(args, tun):
             logger.debug('> %dB', len(data))
             sock.sendall(data)
 
+        logger.warning("quit post")
+
+
     t1 = threading.Thread(target=get)
     t1.setDaemon(True)
     t2 = threading.Thread(target=post)
@@ -145,7 +160,21 @@ def client_main(args, tun):
     t2.start()
 
     gateway = get_default_gateway()
-    add_route(host_ip, gateway)
+
+    if args.down:
+        atexit.register(on_down, args.down)
+
+    add_route(host_ip + '/32', gateway)
+
+    if args.default_gateway:
+        logger.info("set default gateway")
+        call(['route', 'delete', 'default'])
+        check_call(['route', 'add', 'default', args.peer_ip])
+        atexit.register(restore_gateway)
+
+    if args.up:
+        logger.info("Run up script")
+        check_call(args.up)
 
     try:
         while t1.is_alive() and t2.is_alive():
@@ -162,16 +191,20 @@ def decrypt(data):
 def read_connection(f):
     data = f.read(len(FAKE_HEAD))
     if data != FAKE_HEAD:
+        logger.debug("read fake head: %r", data)
         return
+    logger.debug("got fake head")
 
     while True:
         data_len = f.read(2)
         if not data_len:
+            logger.debug("read data len: %dB", len(data))
             break
 
         data_len = unpack('H', data_len)[0]
         data = f.read(data_len)
         if len(data) < data_len:
+            logger.debug("read data (expect %dB): %dB", data_len, len(data))
             break
 
         data = decrypt(data)
@@ -191,3 +224,6 @@ def read_tun(tun):
         yield pack('H', len(data)) + data
 
 
+def on_down(script):
+    logger.info("Run down script")
+    call([script], stdout=open('/dev/null', 'w'))

@@ -5,7 +5,7 @@ import logging
 from socket import gethostbyname
 from time import sleep
 
-from .utils import add_route, get_default_gateway
+from .utils import add_route, get_default_gateway, restore_gateway
 
 logger = logging.getLogger(__name__)
 
@@ -62,13 +62,13 @@ def main(args):
     if args.down:
         atexit.register(on_down, args.down)
 
-    add_route(host_ip, gateway)
+    add_route(host_ip + '/32', gateway)
 
     if args.default_gateway:
         logger.info("set default gateway")
         call(['route', 'delete', 'default'])
         check_call(['route', 'add', 'default', args.server_tun_ip])
-        atexit.register(restore_gateway, gateway)
+        atexit.register(restore_gateway)
 
     if args.up:
         logger.info("Run up script")
@@ -76,10 +76,6 @@ def main(args):
 
     ssh_p.wait()
 
-def restore_gateway(gateway):
-    logger.info("restore gateway to %s", gateway)
-    call(['route', 'delete', 'default'])
-    call(['route', 'add', 'default', gateway])
 
 def server(args):
     local_tun, remote_tun = ['tun%s' % x for x in args.tun.split(':')]
